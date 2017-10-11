@@ -593,6 +593,15 @@
     </sensor>
   </gazebo>
 
+  <!-- add a link with corresponds to ros conventions for camera frames, here z axis should pnt forwards! -->
+  <link name="front_camera_ros_link">
+  </link>
+  <joint name="front_camera_ros_joint" type="fixed">
+    <parent link="front_camera_link"/>
+    <child link="front_camera_ros_link"/>
+    <origin xyz="0 0.0 0.0" rpy="-1.5707963267948966 0.0 -1.5707963267948966"/>
+  </joint>
+
   <gazebo reference="front_camera_link">
     <sensor type="camera" name="front_camera_sensor">
       <update_rate>30.0</update_rate>
@@ -613,14 +622,23 @@
           <stddev>0.007</stddev>
         </noise>
       </camera>
+      <!-- this is basically copied from
+	   https://answers.ros.org/question/61712/how-to-use-libgazebo_ros_cameraso-in-gazebo-urdf/
+	   -->
       <plugin name="front_camera_controller" filename="libgazebo_ros_camera.so">
-        <alwaysOn>false</alwaysOn>
-        <updateRate>0.0</updateRate>
+        <alwaysOn>true</alwaysOn>
+        <updateRate>30.0</updateRate>
         <cameraName>/prius/front_camera</cameraName>
         <imageTopicName>image_raw</imageTopicName>
-        <cameraInfoTopicName>/prius/front_camera_info</cameraInfoTopicName>
-        <frameName>camera_link</frameName>
-        <hackBaseline>0.07</hackBaseline>
+        <cameraInfoTopicName>/prius/front_camera/camera_info</cameraInfoTopicName>
+        <frameName>front_camera_ros_link</frameName>
+	<CxPrime>400.5</CxPrime>
+        <Cx>400.5</Cx>
+        <Cy>400.5</Cy>
+	<!-- image_width / (2*tan(hfov_radian /2)) -->
+	<!-- 320 for wide and 772.55 for narrow stereo camera -->
+	<focalLength>476.70143780997665</focalLength>
+        <hackBaseline>0.0</hackBaseline>
         <distortionK1>0.0</distortionK1>
         <distortionK2>0.0</distortionK2>
         <distortionK3>0.0</distortionK3>
