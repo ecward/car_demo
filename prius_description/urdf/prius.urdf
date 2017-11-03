@@ -116,6 +116,7 @@
       <inertia ixx="2581.13354740" ixy="0.0" ixz="0.0" iyy="591.30846112" iyz="0.0" izz="2681.95008628"/>
     </inertial>
   </link>
+
   <link name="fl_axle">
     <inertial>
       <mass value="1"/>
@@ -123,6 +124,7 @@
       <inertia ixx="0.004" ixy="0.0" ixz="0.0" iyy="0.004" iyz="0.0" izz="0.004"/>
     </inertial>
   </link>
+
   <link name="fr_axle">
     <inertial>
       <mass value="1"/>
@@ -130,6 +132,7 @@
       <inertia ixx="0.004" ixy="0.0" ixz="0.0" iyy="0.004" iyz="0.0" izz="0.004"/>
     </inertial>
   </link>
+
   <link name="front_left_wheel">
     <inertial>
       <mass value="11"/>
@@ -148,6 +151,7 @@
       </geometry>
     </visual>
   </link>
+
   <link name="front_right_wheel">
     <inertial>
       <mass value="11"/>
@@ -166,6 +170,7 @@
       </geometry>
     </visual>
   </link>
+
   <link name="rear_left_wheel">
     <inertial>
       <mass value="11"/>
@@ -184,6 +189,7 @@
       </geometry>
     </visual>
   </link>
+
   <link name="rear_right_wheel">
     <inertial>
       <mass value="11"/>
@@ -202,6 +208,7 @@
       </geometry>
     </visual>
   </link>
+
   <link name="steering_wheel">
     <inertial>
       <mass value="1.0"/>

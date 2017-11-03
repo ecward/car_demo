@@ -802,6 +802,27 @@ void RCVPlugin::KeyControlTypeB(const int _key)
 }
 
 /////////////////////////////////////////////////
+void RCVPlugin::KeyControl(const int _key)
+{
+  if (this->dataPtr->keyControl == 0)
+    this->KeyControlTypeA(_key);
+  else if (this->dataPtr->keyControl == 1)
+    this->KeyControlTypeB(_key);
+}
+
+/////////////////////////////////////////////////
+void RCVPlugin::OnKeyPress(ConstAnyPtr &_msg)
+{
+  this->KeyControl(_msg->int_value());
+}
+
+/////////////////////////////////////////////////
+void RCVPlugin::OnKeyPressIgn(const ignition::msgs::Any &_msg)
+{
+  this->KeyControl(_msg.int_value());
+}
+
+/////////////////////////////////////////////////
 void RCVPlugin::OnReset(const ignition::msgs::Any & /*_msg*/)
 {
   msgs::WorldControl msg;
