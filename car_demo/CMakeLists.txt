@@ -26,6 +26,9 @@ include_directories(include ${catkin_INCLUDE_DIRS} ${GAZEBO_INCLUDE_DIRS} ${SDFo
 add_library(PriusHybridPlugin SHARED plugins/PriusHybridPlugin.cc)
 target_link_libraries(PriusHybridPlugin ${GAZEBO_LIBRARIES} ${IGNITION-MSGS_LIBRARIES})
 
+add_library(RCVPlugin SHARED plugins/RCVPlugin.cc)
+target_link_libraries(RCVPlugin ${GAZEBO_LIBRARIES} ${IGNITION-MSGS_LIBRARIES})
+
 add_library(gazebo_ros_block_laser SHARED plugins/gazebo_ros_block_laser.cpp)
 target_link_libraries(gazebo_ros_block_laser ${GAZEBO_LIBRARIES} ${IGNITION-MSGS_LIBRARIES})
 

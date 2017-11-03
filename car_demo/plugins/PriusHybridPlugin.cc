@@ -386,6 +386,7 @@ void PriusHybridPlugin::Load(physics::ModelPtr _model, sdf::ElementPtr _sdf)
   this->dataPtr->consolePub =
     this->dataPtr->node.Advertise<ignition::msgs::Double_V>("/prius/console");
 
+  //Set up the links (that we later apply forces on)
   std::string chassisLinkName = dPtr->model->GetName() + "::"
     + _sdf->Get<std::string>("chassis");
   dPtr->chassisLink = dPtr->model->GetLink(chassisLinkName);
