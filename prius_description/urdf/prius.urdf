@@ -143,6 +143,18 @@
       <geometry>
         <sphere radius="0.31265"/>
       </geometry>
+
+<!-- You can't set friction in URDF :( -->
+      <surface>
+        <friction>
+          <torsional>
+<coefficient>1.0</coefficient>
+<surface_radius>0.5</surface_radius>
+<use_patch_radius>false</use_patch_radius>
+          </torsional>
+        </friction>
+      </surface>
+
     </collision>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -476,12 +488,21 @@
       <battery_charge_watt_hours>291</battery_charge_watt_hours>
       <battery_discharge_watt_hours>214</battery_discharge_watt_hours>
       <max_steer>0.6458</max_steer>
+
       <flwheel_steering_p_gain>1e4</flwheel_steering_p_gain>
       <frwheel_steering_p_gain>1e4</frwheel_steering_p_gain>
       <flwheel_steering_i_gain>0</flwheel_steering_i_gain>
       <frwheel_steering_i_gain>0</frwheel_steering_i_gain>
       <flwheel_steering_d_gain>3e2</flwheel_steering_d_gain>
       <frwheel_steering_d_gain>3e2</frwheel_steering_d_gain>
+      <!--
+      <flwheel_steering_p_gain>0</flwheel_steering_p_gain>
+      <frwheel_steering_p_gain>0</frwheel_steering_p_gain>
+      <flwheel_steering_i_gain>0</flwheel_steering_i_gain>
+      <frwheel_steering_i_gain>0</frwheel_steering_i_gain>
+      <flwheel_steering_d_gain>0</flwheel_steering_d_gain>
+      <frwheel_steering_d_gain>0</frwheel_steering_d_gain>
+      -->
     </plugin>
   </gazebo>
 

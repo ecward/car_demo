@@ -33,6 +33,19 @@
 
 namespace gazebo
 {
+void set_torsional_friction(physics::CollisionPtr col_ptr,
+                            double mu_torsion,
+                            double patch_radius) {
+  if(col_ptr->GetSurface()->FrictionPyramid() != NULL) {
+    col_ptr->GetSurface()->FrictionPyramid()->SetMuTorsion(mu_torsion);
+    col_ptr->GetSurface()->FrictionPyramid()->SetPatchRadius(patch_radius);
+    col_ptr->GetSurface()->FrictionPyramid()->SetUsePatchRadius(true);
+  } else {
+    throw std::runtime_error("No friction pyramid for object!");
+  }
+}
+
+
   class PriusHybridPluginPrivate
   {
     /// \enum DirectionType
@@ -603,6 +616,18 @@ void PriusHybridPlugin::Load(physics::ModelPtr _model, sdf::ElementPtr _sdf)
   this->dataPtr->brWheelRadius = this->CollisionRadius(
       this->dataPtr->brWheelJoint->GetChild()->GetCollision(id));
 
+
+  //Let's set the friction of the wheels to something reasonable!
+//  gazebo::physics::LinkPtr fl_wheel =
+//      this->dataPtr->flWheelJoint->GetChild();
+//  physics::CollisionPtr tmp = fl_wheel->GetCollision(id);
+//  tmp->GetSurface()->FrictionPyramid()->SetMuTorsion(10.0);
+//  tmp->GetSurface()->FrictionPyramid()->SetPatchRadius(0.5);
+//  tmp->GetSurface()->FrictionPyramid()->SetUsePatchRadius(true);
+
+  set_torsional_friction(this->dataPtr->flWheelJoint->GetChild()->GetCollision(id),1.0,0.02);
+  set_torsional_friction(this->dataPtr->frWheelJoint->GetChild()->GetCollision(id),1.0,0.02);
+
   // Get initial joint friction and add it to braking friction
   dPtr->flJointFriction = dPtr->flWheelJoint->GetParam("friction", 0);
   dPtr->frJointFriction = dPtr->frWheelJoint->GetParam("friction", 0);
@@ -1052,6 +1077,8 @@ void PriusHybridPlugin::Update()
       this->dataPtr->flSteeringAngle - this->dataPtr->flWheelSteeringCmd;
   double flwsCmd = this->dataPtr->flWheelSteeringPID.Update(flwsError, dt);
   this->dataPtr->flWheelSteeringJoint->SetForce(0, flwsCmd);
+
+
   // this->dataPtr->flWheelSteeringJoint->SetPosition(0,
   // this->dataPtr->flWheelSteeringCmd);
   // this->dataPtr->flWheelSteeringJoint->SetLowStop(0,
@@ -1063,6 +1090,8 @@ void PriusHybridPlugin::Update()
       this->dataPtr->frSteeringAngle - this->dataPtr->frWheelSteeringCmd;
   double frwsCmd = this->dataPtr->frWheelSteeringPID.Update(frwsError, dt);
   this->dataPtr->frWheelSteeringJoint->SetForce(0, frwsCmd);
+
+
   // this->dataPtr->frWheelSteeringJoint->SetPosition(0,
   // this->dataPtr->frWheelSteeringCmd);
   // this->dataPtr->frWheelSteeringJoint->SetLowStop(0,
