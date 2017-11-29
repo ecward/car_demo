@@ -17,9 +17,13 @@
   <node pkg="fake_localization" type="fake_localization" name="fake_localization">
     <!-- <remap from="base_pose_ground_truth" to="/prius/base_pose_ground_truth"/> -->
   </node>
+  <!--
   <node pkg="tf2_ros" type="static_transform_publisher" name="very_inaccurate_odom" args="0 0 0 0 0 0 odom base_link"/>
-  <node pkg="car_demo" type="joystick_translator" name="joystick_translator"/>
+  -->
 
+<!-- TODO figure out how we can run joystick at the same time as ctrl...
+  <node pkg="car_demo" type="joystick_translator" name="joystick_translator"/>
+-->
   <!-- Run two joy nodes publishing to the same topic, just to cover two possible joystick locations -->
   <node pkg="joy" type="joy_node" name="joy_node0">
     <param name="dev" value="/dev/input/js0"/>
@@ -28,7 +32,21 @@
     <param name="dev" value="/dev/input/js1"/>
   </node>
 
+<!-- start at default location
   <node name="spawn_urdf" pkg="gazebo_ros" type="spawn_model" args="-param robot_description -urdf -x 3 -y -12 -z 0.5 -model prius"/>
+-->
+
+<!-- start at rightmost parking lot
+  <node name="spawn_urdf" pkg="gazebo_ros" type="spawn_model" args="-param robot_description -urdf -x 25 -y -370 -z 0.5 -model prius"/>
+-->
+
+<!-- start on road, close to leftmost parking lot
+  <node name="spawn_urdf" pkg="gazebo_ros" type="spawn_model" args="-param robot_description -urdf -x 248 -y 352 -z 0.5 -Y 2 -model prius"/>
+-->
+
+<!-- start on road, close to prototype safe stop area -->
+  <node name="spawn_urdf" pkg="gazebo_ros" type="spawn_model" args="-param robot_description -urdf -x 26.2  -y -165.0 -z 0.5 -Y -1.7 -model prius"/>
+
 
   <node name="rviz" pkg="rviz" type="rviz" args="-d $(arg rvizconfig)" required="true" />
 </launch>
