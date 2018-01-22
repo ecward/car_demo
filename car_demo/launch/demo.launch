@@ -44,9 +44,14 @@
   <node name="spawn_urdf" pkg="gazebo_ros" type="spawn_model" args="-param robot_description -urdf -x 248 -y 352 -z 0.5 -Y 2 -model prius"/>
 -->
 
-<!-- start on road, close to prototype safe stop area -->
-  <node name="spawn_urdf" pkg="gazebo_ros" type="spawn_model" args="-param robot_description -urdf -x 26.2  -y -165.0 -z 0.5 -Y -1.7 -model prius"/>
+<!-- start on leftmost parking lot -->
+  <node name="spawn_urdf" pkg="gazebo_ros" type="spawn_model" args="-param robot_description -urdf -x 154.0 -y 360.0 -z 0.5 -Y -0.16 -model prius"/>
 
+
+
+<!-- start on road, close to prototype safe stop area
+  <node name="spawn_urdf" pkg="gazebo_ros" type="spawn_model" args="-param robot_description -urdf -x 26.2  -y -165.0 -z 0.5 -Y -1.7 -model prius"/>
+-->
 
   <node name="rviz" pkg="rviz" type="rviz" args="-d $(arg rvizconfig)" required="true" />
 </launch>
