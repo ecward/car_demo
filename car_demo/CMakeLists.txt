@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(car_demo)
 
+#If a newer version of protobuff is installed in /usr/local/bin this won't build. So we will set the path so that the ubunthu default one will be used
 set (PRIUSCUP_MAJOR_VERSION 0)
 set (PRIUSCUP_MINOR_VERSION 1)
 set (PRIUSCUP_PATCH_VERSION 0)
@@ -43,3 +44,7 @@ install(TARGETS PriusHybridPlugin gazebo_ros_block_laser
 
 install(DIRECTORY models DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
 install(DIRECTORY worlds DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
+
+install(DIRECTORY launch/
+   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch
+)
