@@ -10,7 +10,9 @@
 
 ///@todo Include relevant message types to send control commands
 ///replace this include...
-//#include <prius_msgs/Control.h>
+#include <rcv_msgs/Control.h>
+#include <rcv_msgs/control_command.h>
+#include <rcv_msgs/value_monitor.h>
 
 namespace gazebo
 {
@@ -68,7 +70,10 @@ private:
   /// \brief Key control type B
   /// \param[in] _key key value
   void KeyControlTypeB(const int _key);
+  
+  void OnRCVCommand(const rcv_msgs::Control::ConstPtr &msg);
 
+  void OnRCVCommand_new(const rcv_msgs::control_command::ConstPtr &msg);
 
   /// \brief Command to reset the world
   /// \param[in] _msg Int32 message data. Not used

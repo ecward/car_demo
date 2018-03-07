@@ -2,7 +2,8 @@
 #include <fstream>
 #include <mutex>
 #include <thread>
-
+#include <cmath>
+#include <math.h>
 #include <ignition/math/Pose3.hh>
 #include <ignition/transport/Node.hh>
 #include <ignition/transport/AdvertiseOptions.hh>
@@ -12,6 +13,9 @@
 #include <gazebo/common/Time.hh>
 
 #include <ros/ros.h>
+#include "std_msgs/String.h"
+
+#define _USE_MATH_DEFINES
 
 namespace gazebo {
 /**
@@ -79,7 +83,7 @@ public:
    * In the simulator we will make the car move by applying
    * torques to the different joints. We will make the car move
    * forward and backwards by applying torqe to fl,fr,bl,brWheelJoint
-   * and make it turn by applying torque to fl,fr,bl,brWheelSteeringJoint
+   * and make it turn by applying torque to fl,fr,bl,bgJoint
    *
    * Look at axis in the urdf.
    * Eg. for front_left_wheel_joint, it's xyz="1 0 0"
@@ -113,8 +117,15 @@ public:
 
   /// \brief Front right wheel steering joint
   physics::JointPtr frWheelSteeringJoint;
-
+  
   ///@todo add pointers to bl,brSteeringJoint
+  
+  /// \brief Rear left wheel steering joint
+  physics::JointPtr blWheelSteeringJoint;
+
+  /// \brief rear right wheel steering joint
+  physics::JointPtr brWheelSteeringJoint;
+
 
   /// \brief Steering wheel joint
   /// Just here to make the wheel turn, which looks cool (we don't
@@ -138,6 +149,12 @@ public:
   common::PID frWheelSteeringPID;
 
   ///@todo add PIDs for rear left/right wheel steering joints
+  
+  /// \brief PID control for the back left wheel steering joint
+  common::PID blWheelSteeringPID;
+
+  /// \brief PID control for the back right wheel steering joint
+  common::PID brWheelSteeringPID;
 
   /// \brief PID control for steering wheel joint
   common::PID handWheelPID;
@@ -196,9 +213,21 @@ public:
 
   /// \brief Front right wheel desired steering angle (radians)
   double frWheelSteeringCmd = 0;
+  
+  /// \brief Front left wheel desired steering angle (radians)
+  double blWheelSteeringCmd = 0;
+
+  /// \brief Front right wheel desired steering angle (radians)
+  double brWheelSteeringCmd = 0;
 
   /// \brief Steering wheel desired angle (radians)
   double handWheelCmd = 0;
+  
+  /// \brief Kappa value used in Ackerman steering
+  double kappaCmd = 0;
+
+  /// \brief Beta value used in Ackerman steering
+  double betaCmd = 0;
 
   /// \brief Front left wheel radius
   double flWheelRadius = 0;
@@ -234,8 +263,11 @@ public:
   double backTrackWidth = 0;
 
   /// \brief Gas pedal position in percentage. 1.0 = Fully accelerated.
-  double gasPedalPercent = 0;
-
+  double gasPedalPercent = 0; 
+  double fl_torque_percent = 0;
+  double fr_torque_percent = 0;
+  double bl_torque_percent = 0;
+  double br_torque_percent = 0;
 
   /// \brief Threshold delimiting the gas pedal (throttle) low and medium
   /// ranges.
@@ -270,6 +302,12 @@ public:
 
   /// \brief Steering angle of front right wheel at last update (radians)
   double frSteeringAngle = 0;
+  
+  /// \brief Steering angle of rear left wheel at last update (radians)
+  double blSteeringAngle = 0;
+
+  /// \brief Steering angle of rear right wheel at last update (radians)
+  double brSteeringAngle = 0;
 
   /// \brief Linear velocity of chassis c.g. in world frame at last update (m/s)
   ignition::math::Vector3d chassisLinearVelocity;
@@ -316,7 +354,7 @@ RCVPlugin::RCVPlugin()
   ros::NodeHandle nh;
   ///@todo subsribe to control input messages
   /// simlar to this.
-  //this->dataPtr->controlSub = nh.subscribe("prius", 10, &PriusHybridPlugin::OnPriusCommand, this);
+  this->dataPtr->controlSub = nh.subscribe("rcv_control_cmd", 10, &RCVPlugin::OnRCVCommand_new, this);
 
   //Set some default values for parameters
   this->dataPtr->directionState = RCVPluginPrivate::FORWARD;
@@ -324,6 +362,64 @@ RCVPlugin::RCVPlugin()
   this->dataPtr->frWheelRadius = 0.3;
   this->dataPtr->blWheelRadius = 0.3;
   this->dataPtr->brWheelRadius = 0.3;
+}
+
+void RCVPlugin::OnRCVCommand(const rcv_msgs::Control::ConstPtr &msg)
+{
+  this->dataPtr->lastSteeringCmdTime = this->dataPtr->world->SimTime();
+  this->dataPtr->lastPedalCmdTime = this->dataPtr->world->SimTime();
+
+  // Steering wheel command
+  double handCmd = (msg->steer < 0.)
+    ? (msg->steer * -this->dataPtr->handWheelLow)
+    : (msg->steer * this->dataPtr->handWheelHigh);
+
+  handCmd = ignition::math::clamp(handCmd, this->dataPtr->handWheelLow,
+      this->dataPtr->handWheelHigh);
+  this->dataPtr->handWheelCmd = handCmd;
+
+  // Brake command
+  double brake = ignition::math::clamp(msg->brake, 0.0, 1.0);
+  this->dataPtr->brakePedalPercent = brake;
+
+  // Throttle command
+  double throttle = ignition::math::clamp(msg->throttle, 0.0, 1.0);
+  this->dataPtr->gasPedalPercent = throttle;
+
+  switch (msg->shift_gears)
+  {
+    case rcv_msgs::Control::NEUTRAL:
+      this->dataPtr->directionState = RCVPluginPrivate::NEUTRAL;
+      break;
+    case rcv_msgs::Control::FORWARD:
+      this->dataPtr->directionState = RCVPluginPrivate::FORWARD;
+      break;
+    case rcv_msgs::Control::REVERSE:
+      this->dataPtr->directionState = RCVPluginPrivate::REVERSE;
+      break;
+    default:
+      break;
+  }
+
+}
+
+void RCVPlugin::OnRCVCommand_new(const rcv_msgs::control_command::ConstPtr &msg)
+{
+  this->dataPtr->lastSteeringCmdTime = this->dataPtr->world->SimTime();
+  this->dataPtr->lastPedalCmdTime = this->dataPtr->world->SimTime();
+
+  // torque command. TODO: preprocessing of torques
+  double fl_torque = msg->fl_torque;
+  double fr_torque = msg->fr_torque;
+  double bl_torque = msg->rl_torque;
+  double br_torque = msg->rr_torque;
+
+  this->dataPtr->handWheelCmd = 2.89469*this->dataPtr->handWheelHigh*msg->kappa;
+  this->dataPtr->betaCmd = msg->beta;
+  this->dataPtr->fl_torque_percent = fl_torque;
+  this->dataPtr->fr_torque_percent = fr_torque;
+  this->dataPtr->bl_torque_percent = bl_torque;
+  this->dataPtr->br_torque_percent = br_torque;
 }
 
 /////////////////////////////////////////////////
@@ -350,7 +446,7 @@ void RCVPlugin::Load(physics::ModelPtr _model, sdf::ElementPtr _sdf)
 
   //Set callbacks for what happens when simulation
   //is reset, or stopped. This uses the "ignition" library
-  //which provides simular functionality to ROS (e.g. message passing)
+  //which provides similar functionality to ROS (e.g. message passing)
   //but is what is used in gazebo.
   this->dataPtr->node.Subscribe("/rcv/reset",
                                 &RCVPlugin::OnReset, this);
@@ -441,7 +537,28 @@ void RCVPlugin::Load(physics::ModelPtr _model, sdf::ElementPtr _sdf)
     return;
   }
 
-  ///@todo also set up blWheelSteeringJoint and beWheelSteeringJoint
+    ///@todo also set up blWheelSteeringJoint and beWheelSteeringJoint
+  
+   std::string blWheelSteeringJointName = this->dataPtr->model->GetName() + "::"
+      + _sdf->Get<std::string>("back_left_wheel_steering");
+  this->dataPtr->blWheelSteeringJoint =
+      this->dataPtr->model->GetJoint(blWheelSteeringJointName);
+  if (!this->dataPtr->blWheelSteeringJoint)
+  {
+    std::cerr << "could not find back left steering joint" <<std::endl;
+    return;
+  }
+
+  std::string brWheelSteeringJointName = this->dataPtr->model->GetName() + "::"
+      + _sdf->Get<std::string>("back_right_wheel_steering");
+  this->dataPtr->brWheelSteeringJoint =
+      this->dataPtr->model->GetJoint(brWheelSteeringJointName);
+  if (!this->dataPtr->brWheelSteeringJoint)
+  {
+    std::cerr << "could not find back right steering joint" <<std::endl;
+    return;
+  }
+
 
   //Load parameters from urdf file, defined for this plugin, that
   //is attached to the Model.
@@ -463,7 +580,7 @@ void RCVPlugin::Load(physics::ModelPtr _model, sdf::ElementPtr _sdf)
     this->dataPtr->frontTorque = paramDefault;
 
   paramName = "back_torque";
-  paramDefault = 2000;
+  paramDefault = 0;
   if (_sdf->HasElement(paramName))
     this->dataPtr->backTorque = _sdf->Get<double>(paramName);
   else
@@ -538,9 +655,52 @@ void RCVPlugin::Load(physics::ModelPtr _model, sdf::ElementPtr _sdf)
     this->dataPtr->frWheelSteeringPID.SetDGain(_sdf->Get<double>(paramName));
   else
     this->dataPtr->frWheelSteeringPID.SetDGain(paramDefault);
-
+  
   ///@todo also set gains for blWheelSteering and brWheelSteering
+  paramName = "blwheel_steering_p_gain";
+  paramDefault = 0;
+  if (_sdf->HasElement(paramName))
+    this->dataPtr->blWheelSteeringPID.SetPGain(_sdf->Get<double>(paramName));
+  else
+    this->dataPtr->blWheelSteeringPID.SetPGain(paramDefault);
 
+  paramName = "brwheel_steering_p_gain";
+  paramDefault = 0;
+  if (_sdf->HasElement(paramName))
+    this->dataPtr->brWheelSteeringPID.SetPGain(_sdf->Get<double>(paramName));
+  else
+    this->dataPtr->brWheelSteeringPID.SetPGain(paramDefault);
+
+  paramName = "blwheel_steering_i_gain";
+  paramDefault = 0;
+  if (_sdf->HasElement(paramName))
+    this->dataPtr->blWheelSteeringPID.SetIGain(_sdf->Get<double>(paramName));
+  else
+    this->dataPtr->blWheelSteeringPID.SetIGain(paramDefault);
+
+  paramName = "brwheel_steering_i_gain";
+  paramDefault = 0;
+  if (_sdf->HasElement(paramName))
+    this->dataPtr->brWheelSteeringPID.SetIGain(_sdf->Get<double>(paramName));
+  else
+    this->dataPtr->brWheelSteeringPID.SetIGain(paramDefault);
+
+  paramName = "blwheel_steering_d_gain";
+  paramDefault = 0;
+  if (_sdf->HasElement(paramName))
+    this->dataPtr->blWheelSteeringPID.SetDGain(_sdf->Get<double>(paramName));
+  else
+    this->dataPtr->blWheelSteeringPID.SetDGain(paramDefault);
+
+  paramName = "brwheel_steering_d_gain";
+  paramDefault = 0;
+  if (_sdf->HasElement(paramName))
+    this->dataPtr->brWheelSteeringPID.SetDGain(_sdf->Get<double>(paramName));
+  else
+    this->dataPtr->brWheelSteeringPID.SetDGain(paramDefault);
+ 
+
+  
   this->UpdateHandWheelRatio();
 
   // Update wheel radius for each wheel from SDF collision objects
@@ -609,6 +769,12 @@ void RCVPlugin::Load(physics::ModelPtr _model, sdf::ElementPtr _sdf)
   this->dataPtr->frWheelSteeringPID.SetCmdMax(kMaxSteeringForceMagnitude);
   this->dataPtr->frWheelSteeringPID.SetCmdMin(-kMaxSteeringForceMagnitude);
 
+  this->dataPtr->blWheelSteeringPID.SetCmdMax(kMaxSteeringForceMagnitude);
+  this->dataPtr->blWheelSteeringPID.SetCmdMin(-kMaxSteeringForceMagnitude);
+
+  this->dataPtr->brWheelSteeringPID.SetCmdMax(kMaxSteeringForceMagnitude);
+  this->dataPtr->brWheelSteeringPID.SetCmdMin(-kMaxSteeringForceMagnitude);
+
   //Here we tell the simulator that the Update function should be called
   //for the simulation cycles
   this->dataPtr->updateConnection = event::Events::ConnectWorldUpdateBegin(
@@ -657,7 +823,7 @@ void RCVPlugin::KeyControlTypeA(const int _key)
     case 113:
     {
       this->dataPtr->gasPedalPercent = 0.0;
-      this->dataPtr->brakePedalPercent += 0.1;
+      this->dataPtr->brakePedalPercent += 0.03;
       this->dataPtr->brakePedalPercent =
           std::min(this->dataPtr->brakePedalPercent, 1.0);
       this->dataPtr->lastPedalCmdTime = this->dataPtr->world->SimTime();
@@ -667,7 +833,7 @@ void RCVPlugin::KeyControlTypeA(const int _key)
     case 65:
     case 97:
     {
-      this->dataPtr->handWheelCmd += 0.25;
+      this->dataPtr->handWheelCmd += 0.15;
       this->dataPtr->handWheelCmd = std::min(this->dataPtr->handWheelCmd,
           this->dataPtr->handWheelHigh);
       this->dataPtr->lastSteeringCmdTime = this->dataPtr->world->SimTime();
@@ -677,7 +843,7 @@ void RCVPlugin::KeyControlTypeA(const int _key)
     case 68:
     case 100:
     {
-      this->dataPtr->handWheelCmd -= 0.25;
+      this->dataPtr->handWheelCmd -= 0.15;
       this->dataPtr->handWheelCmd = std::max(this->dataPtr->handWheelCmd,
           this->dataPtr->handWheelLow);
       this->dataPtr->lastSteeringCmdTime = this->dataPtr->world->SimTime();
@@ -866,13 +1032,24 @@ void RCVPlugin::Reset()
   this->dataPtr->directionState = RCVPluginPrivate::FORWARD;
   this->dataPtr->flWheelSteeringCmd = 0;
   this->dataPtr->frWheelSteeringCmd = 0;
+  this->dataPtr->blWheelSteeringCmd = 0;
+  this->dataPtr->brWheelSteeringCmd = 0;
   this->dataPtr->handWheelCmd = 0;
+  this->dataPtr->kappaCmd = 0;
+  this->dataPtr->betaCmd = 0;
   this->dataPtr->gasPedalPercent = 0;
+  this->dataPtr->fl_torque_percent = 0;
+  this->dataPtr->fr_torque_percent = 0;
+  this->dataPtr->bl_torque_percent = 0;
+  this->dataPtr->br_torque_percent = 0;
+
   this->dataPtr->brakePedalPercent = 0;
   this->dataPtr->handbrakePercent = 1.0;
   this->dataPtr->handWheelAngle  = 0;
   this->dataPtr->flSteeringAngle = 0;
   this->dataPtr->frSteeringAngle = 0;
+  this->dataPtr->blSteeringAngle = 0;
+  this->dataPtr->brSteeringAngle = 0;
   this->dataPtr->flWheelAngularVelocity  = 0;
   this->dataPtr->frWheelAngularVelocity = 0;
   this->dataPtr->blWheelAngularVelocity = 0;
@@ -903,6 +1080,8 @@ void RCVPlugin::Update()
   dPtr->handWheelAngle = dPtr->handWheelJoint->Position();
   dPtr->flSteeringAngle = dPtr->flWheelSteeringJoint->Position();
   dPtr->frSteeringAngle = dPtr->frWheelSteeringJoint->Position();
+  dPtr->blSteeringAngle = dPtr->blWheelSteeringJoint->Position();
+  dPtr->brSteeringAngle = dPtr->brWheelSteeringJoint->Position();
 
   dPtr->flWheelAngularVelocity = dPtr->flWheelJoint->GetVelocity(0);
   dPtr->frWheelAngularVelocity = dPtr->frWheelJoint->GetVelocity(0);
@@ -914,10 +1093,16 @@ void RCVPlugin::Update()
   ///@todo get rid of non SI units!
 
   // Convert meter/sec to miles/hour
-  double linearVel = dPtr->chassisLinearVelocity.Length() * 2.23694;
+  //double linearVel = dPtr->chassisLinearVelocity.Length() * 2.23694;
+
+  // unit: meter/sec
+  double linearVel = dPtr->chassisLinearVelocity.Length();
 
   // Distance traveled in miles.
-  this->dataPtr->odom += (fabs(linearVel) * dt/3600.0);
+  //this->dataPtr->odom += (fabs(linearVel) * dt/3600.0);
+
+  // Distance traveled in meters.
+  this->dataPtr->odom += (fabs(linearVel) * dt);
 
   bool neutral = dPtr->directionState == RCVPluginPrivate::NEUTRAL;
 
@@ -950,16 +1135,79 @@ void RCVPlugin::Update()
   // PID (position) steering joints based on steering position
   // Ackermann steering geometry here
   //  \TODO provide documentation for these equations
-  double tanSteer =
+  double beta = this->dataPtr->betaCmd;
+  double l = 1.25;
+  double pie = atan(1)*4;
+  double gamma_0 = 0.6435;
+  double eps_kappa = 0.000001;
+  //double tanSteer =
+      //tan(this->dataPtr->handWheelCmd * this->dataPtr->steeringRatio);
+  double kappa_des = this->dataPtr->handWheelCmd;
+
+  if (kappa_des > 0) {
+	  double r = 2.89469*this->dataPtr->handWheelHigh / kappa_des; //2.89469 factor to make wheel angles maximum 25 degrees
+	  this->dataPtr->flWheelSteeringCmd = beta+atan2(l*cos(gamma_0-beta),(r-l*sin(gamma_0-beta)));
+	  this->dataPtr->frWheelSteeringCmd = beta+atan2(l*cos(gamma_0+beta),(r+l*sin(gamma_0+beta)));
+	  this->dataPtr->blWheelSteeringCmd = beta-atan2(l*cos(gamma_0+beta),(r-l*sin(gamma_0+beta)));
+	  this->dataPtr->brWheelSteeringCmd = beta-atan2(l*cos(gamma_0-beta),(r+l*sin(gamma_0-beta)));
+  }
+  else if (kappa_des == 0) {
+	  double r = 2.89469*this->dataPtr->handWheelHigh / 0.0001; //2.89469 factor to make wheel angles maximum 25 degrees
+	  this->dataPtr->flWheelSteeringCmd = beta+atan2(l*cos(gamma_0-beta),(r-l*sin(gamma_0-beta)));
+	  this->dataPtr->frWheelSteeringCmd = beta+atan2(l*cos(gamma_0+beta),(r+l*sin(gamma_0+beta)));
+	  this->dataPtr->blWheelSteeringCmd = beta-atan2(l*cos(gamma_0+beta),(r-l*sin(gamma_0+beta)));
+	  this->dataPtr->brWheelSteeringCmd = beta-atan2(l*cos(gamma_0-beta),(r+l*sin(gamma_0-beta)));
+  }
+  else {
+	  double r = -2.89469*this->dataPtr->handWheelHigh / kappa_des; //2.89469 factor to make wheel angles maximum 25 degrees
+	  this->dataPtr->frWheelSteeringCmd = -beta-atan2(l*cos(gamma_0-beta),(r-l*sin(gamma_0-beta)));
+	  this->dataPtr->flWheelSteeringCmd = -beta-atan2(l*cos(gamma_0+beta),(r+l*sin(gamma_0+beta)));
+	  this->dataPtr->brWheelSteeringCmd = -beta+atan2(l*cos(gamma_0+beta),(r-l*sin(gamma_0+beta)));
+	  this->dataPtr->blWheelSteeringCmd = -beta+atan2(l*cos(gamma_0-beta),(r+l*sin(gamma_0-beta)));
+  }
+
+  // while (this->dataPtr->flWheelSteeringCmd > pie/2) {
+  //     this->dataPtr->flWheelSteeringCmd = pie/2;  
+  // }
+  // while (this->dataPtr->frWheelSteeringCmd > pie/2) {
+  //     this->dataPtr->frWheelSteeringCmd = pie/2; 
+  // }
+  // while (this->dataPtr->blWheelSteeringCmd > pie/2) {
+  //     this->dataPtr->blWheelSteeringCmd = pie/2; 
+  // }
+  // while (this->dataPtr->brWheelSteeringCmd > pie/2) {
+  //     this->dataPtr->brWheelSteeringCmd = pie/2; 
+  // }
+  // while (this->dataPtr->flWheelSteeringCmd < -pie/2) {
+  //     this->dataPtr->flWheelSteeringCmd = -pie/2; 
+  // }
+  // while (this->dataPtr->frWheelSteeringCmd < -pie/2) {
+  //     this->dataPtr->frWheelSteeringCmd = -pie/2; 
+  // }
+  // while (this->dataPtr->blWheelSteeringCmd < -pie/2) {
+  //     this->dataPtr->blWheelSteeringCmd = -pie/2; 
+  // }
+  // while (this->dataPtr->brWheelSteeringCmd < -pie/2) {
+  //     this->dataPtr->brWheelSteeringCmd = -pie/2; 
+  // }
+
+
+ /* double tanSteer =
       tan(this->dataPtr->handWheelCmd * this->dataPtr->steeringRatio);
   this->dataPtr->flWheelSteeringCmd = atan2(tanSteer,
-      1 - this->dataPtr->frontTrackWidth/2/this->dataPtr->wheelbaseLength *
-      tanSteer);
-  this->dataPtr->frWheelSteeringCmd = atan2(tanSteer,
       1 + this->dataPtr->frontTrackWidth/2/this->dataPtr->wheelbaseLength *
       tanSteer);
-  // this->flWheelSteeringCmd = this->handWheelAngle * this->steeringRatio;
-  // this->frWheelSteeringCmd = this->handWheelAngle * this->steeringRatio;
+  this->dataPtr->frWheelSteeringCmd = atan2(tanSteer,
+      1 - this->dataPtr->frontTrackWidth/2/this->dataPtr->wheelbaseLength *
+      tanSteer);
+  this->dataPtr->blWheelSteeringCmd = atan2(tanSteer,
+      1 + this->dataPtr->backTrackWidth/2/this->dataPtr->wheelbaseLength *
+      tanSteer);
+  this->dataPtr->brWheelSteeringCmd = atan2(tanSteer,
+      1 - this->dataPtr->backTrackWidth/2/this->dataPtr->wheelbaseLength *
+      tanSteer);
+  this->flWheelSteeringCmd = this->handWheelAngle * this->steeringRatio;
+  this->frWheelSteeringCmd = this->handWheelAngle * this->steeringRatio;*/
 
   double flwsError =
       this->dataPtr->flSteeringAngle - this->dataPtr->flWheelSteeringCmd;
@@ -971,6 +1219,17 @@ void RCVPlugin::Update()
       this->dataPtr->frSteeringAngle - this->dataPtr->frWheelSteeringCmd;
   double frwsCmd = this->dataPtr->frWheelSteeringPID.Update(frwsError, dt);
   this->dataPtr->frWheelSteeringJoint->SetForce(0, frwsCmd);
+
+  double blwsError =
+      this->dataPtr->blSteeringAngle - this->dataPtr->blWheelSteeringCmd;
+  double blwsCmd = this->dataPtr->blWheelSteeringPID.Update(blwsError, dt);
+  this->dataPtr->blWheelSteeringJoint->SetForce(0, blwsCmd);
+
+
+  double brwsError =
+      this->dataPtr->brSteeringAngle - this->dataPtr->brWheelSteeringCmd;
+  double brwsCmd = this->dataPtr->brWheelSteeringPID.Update(brwsError, dt);
+  this->dataPtr->brWheelSteeringJoint->SetForce(0, brwsCmd);
 
   ///@todo this longitudinal model might not be the best for the
   /// RCV, replace it.
@@ -998,6 +1257,11 @@ void RCVPlugin::Update()
   // torque direction.
   // also, make sure gas pedal is at least as large as the creepPercent.
   double gasPercent = std::max(this->dataPtr->gasPedalPercent, creepPercent);
+  double fltorquepercent = this->dataPtr->fl_torque_percent;
+  double frtorquepercent = this->dataPtr->fr_torque_percent;
+  double bltorquepercent = this->dataPtr->bl_torque_percent;
+  double brtorquepercent = this->dataPtr->br_torque_percent;
+
   double gasMultiplier = this->GasTorqueMultiplier();
   double flGasTorque = 0, frGasTorque = 0, blGasTorque = 0, brGasTorque = 0;
   // Apply equal torque at left and right wheels, which is an implicit model
@@ -1005,14 +1269,14 @@ void RCVPlugin::Update()
   if (fabs(dPtr->flWheelAngularVelocity * dPtr->flWheelRadius) < dPtr->maxSpeed &&
       fabs(dPtr->frWheelAngularVelocity * dPtr->frWheelRadius) < dPtr->maxSpeed)
   {
-    flGasTorque = gasPercent*dPtr->frontTorque * gasMultiplier;
-    frGasTorque = gasPercent*dPtr->frontTorque * gasMultiplier;
+    flGasTorque = fltorquepercent * dPtr->frontTorque * gasMultiplier;
+    frGasTorque = frtorquepercent * dPtr->frontTorque * gasMultiplier;
   }
   if (fabs(dPtr->blWheelAngularVelocity * dPtr->blWheelRadius) < dPtr->maxSpeed &&
       fabs(dPtr->brWheelAngularVelocity * dPtr->brWheelRadius) < dPtr->maxSpeed)
   {
-    blGasTorque = gasPercent * dPtr->backTorque * gasMultiplier;
-    brGasTorque = gasPercent * dPtr->backTorque * gasMultiplier;
+    blGasTorque = bltorquepercent * dPtr->backTorque * gasMultiplier;
+    brGasTorque = brtorquepercent * dPtr->backTorque * gasMultiplier;
   }
 
   // auto release handbrake as soon as the gas pedal is depressed
@@ -1029,6 +1293,8 @@ void RCVPlugin::Update()
   }
 
   brakePercent = ignition::math::clamp(brakePercent, 0.0, 1.0);
+  brakePercent = 0;
+
   dPtr->flWheelJoint->SetParam("friction", 0,
       dPtr->flJointFriction + brakePercent * dPtr->frontBrakeTorque);
   dPtr->frWheelJoint->SetParam("friction", 0,
@@ -1043,11 +1309,21 @@ void RCVPlugin::Update()
   this->dataPtr->blWheelJoint->SetForce(0, blGasTorque);
   this->dataPtr->brWheelJoint->SetForce(0, brGasTorque);
 
+  // this->dataPtr->flWheelJoint->SetForce(0, 10);
+  // this->dataPtr->frWheelJoint->SetForce(0, 10);
+  // this->dataPtr->blWheelJoint->SetForce(0, 10);
+  // this->dataPtr->brWheelJoint->SetForce(0, 10);
 
   ///@todo it might be cool to output some data, e.g. current
   /// speed, gear etc (look at lines 1249-1300 in PriusHybridPlugin)
   /// I suggest that you use ROS topics instead of ignition topics for
   /// this.
+
+  //ROS_INFO_STREAM_NAMED("flSteeringCmd", "flSteeringCmd: " << this->dataPtr->flWheelSteeringCmd);
+  //ROS_INFO_STREAM_NAMED("frSteeringCmd", "frSteeringCmd: " << this->dataPtr->frWheelSteeringCmd);
+  //ROS_INFO_STREAM_NAMED("blSteeringCmd", "blSteeringCmd: " << this->dataPtr->blWheelSteeringCmd);
+  //ROS_INFO_STREAM_NAMED("brSteeringCmd", "brSteeringCmd: " << this->dataPtr->brWheelSteeringCmd);
+  //ROS_INFO_STREAM_NAMED("linearVel", "" << linearVel);
 
   // reset if last command is more than x sec ago
   if ((curTime - this->dataPtr->lastPedalCmdTime).Double() > 0.3)
@@ -1061,6 +1337,7 @@ void RCVPlugin::Update()
     this->dataPtr->handWheelCmd = 0;
   }
 }
+
 
 /////////////////////////////////////////////////
 void RCVPlugin::UpdateHandWheelRatio()
