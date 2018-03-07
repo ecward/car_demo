@@ -283,6 +283,18 @@
 
 
   <!-- Sensor links and fixed joints -->
+  <link name="imu_link">
+  <inertial>
+    <mass value="1"/>
+    <inertia ixx="0.001" ixy="0.0" ixz="0.0" iyy="0.001" iyz="0.0" izz="0.001"/>
+  </inertial>
+  </link>
+  <joint name="imu_joint" type="fixed">
+    <parent link="chassis"/>
+    <child link="imu_link"/>
+    <origin xyz="0 1.45 0.4" rpy="0 0 -1.57"/>
+  </joint>
+
   <link name="center_laser_link">
     <inertial>
       <mass value="1"/>
@@ -506,6 +518,28 @@
     </plugin>
   </gazebo>
 
+
+<!--
+<gazebo reference="imu_link">
+  <gravity>true</gravity>
+  <sensor name="imu_sensor" type="imu">
+    <always_on>true</always_on>
+    <update_rate>100</update_rate>
+    <visualize>true</visualize>
+    <topic>__default_topic__</topic>
+    <plugin filename="libgazebo_ros_imu_sensor.so" name="imu_plugin">
+      <topicName>/imu</topicName>
+      <bodyName>imu_link</bodyName>
+      <updateRateHZ>30.0</updateRateHZ>
+      <gaussianNoise>0.00000001</gaussianNoise>
+      <xyzOffset>0 0 0</xyzOffset>
+      <rpyOffset>0 0 0</rpyOffset>
+      <frameName>imu_link</frameName>
+    </plugin>
+    <pose>0 0 0 0 0 0</pose>
+  </sensor>
+</gazebo>
+-->
   <gazebo>
     <plugin name="joint_state_publisher" filename="libgazebo_ros_joint_state_publisher.so">
       <!-- <robotNamespace>/prius</robotNamespace> -->
@@ -525,26 +559,29 @@
     </plugin>
   </gazebo>
 
+<!-- major resource sink! -->
+<!-- maybe 16 gpu lasers is faster... -->
   <gazebo reference="center_laser_link">
     <sensor name='center_laser_sensor' type='ray'>
       <ray>
         <scan>
           <horizontal>
-            <samples>512</samples>
+            <samples>1024</samples>
             <resolution>1</resolution>
             <min_angle>-3.14</min_angle>
             <max_angle>3.14</max_angle>
           </horizontal>
           <vertical>
             <samples>16</samples>
-            <min_angle>-0.1</min_angle>
-            <max_angle>-0.35</max_angle>
+            <min_angle>0.26179938779914941</min_angle>
+            <max_angle>-0.26179938779914941</max_angle>
           </vertical>
         </scan>
         <range>
           <min>0.2</min>
-          <max>30</max>
-          <resolution>0.01</resolution>
+          <max>100</max>
+          <!-- was 0.01 probably too heavy for gazeboo... -->
+          <resolution>0.05</resolution>
         </range>
       </ray>
       <plugin name='center_laser' filename='libgazebo_ros_block_laser.so'>
@@ -552,7 +589,7 @@
         <frameName>center_laser_link</frameName>
       </plugin>
       <always_on>1</always_on>
-      <update_rate>30</update_rate>
+      <update_rate>10</update_rate>
       <visualize>0</visualize>
     </sensor>
   </gazebo>

@@ -2,21 +2,29 @@
 <launch>
   <arg name="model" default="$(find prius_description)/urdf/prius.urdf"/>
   <arg name="rvizconfig" default="$(find car_demo)/rviz/demo.rviz" />
+  <arg name="x_start" default="3.0" />
+  <arg name="y_start" default="-12.0" />
+  <arg name="z_start" default="0.5" />
+  <arg name="yaw_start" default="0.16" />
 
   <param name="robot_description" textfile="$(arg model)"/>
 
+<!-- can't figure out why gazebo crashes on control-c -->
   <include file="$(find gazebo_ros)/launch/empty_world.launch">
     <arg name="verbose" value="true"/>
     <arg name="world_name" value="$(find car_demo)/worlds/mcity.world"/>
+    <arg name="debug" value="false" />
   </include>
 
   <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher" >
     <!-- <remap from="robot_description" to="different_robot_description" /> -->
     <!-- <remap from="joint_states" to="/prius/joint_states" /> -->
   </node>
+  <!--
   <node pkg="fake_localization" type="fake_localization" name="fake_localization">
-    <!-- <remap from="base_pose_ground_truth" to="/prius/base_pose_ground_truth"/> -->
   </node>
+  -->
+
   <!--
   <node pkg="tf2_ros" type="static_transform_publisher" name="very_inaccurate_odom" args="0 0 0 0 0 0 odom base_link"/>
   -->
@@ -32,6 +40,9 @@
     <param name="dev" value="/dev/input/js1"/>
   </node>
 
+  <node name="spawn_urdf" pkg="gazebo_ros" type="spawn_model"
+  args="-param robot_description -urdf -x $(arg x_start) -y $(arg y_start) -z $(arg z_start) -Y $(arg yaw_start) -model prius"/>
+
 <!-- start at default location
   <node name="spawn_urdf" pkg="gazebo_ros" type="spawn_model" args="-param robot_description -urdf -x 3 -y -12 -z 0.5 -model prius"/>
 -->
@@ -45,8 +56,9 @@
 -->
 
 <!-- start on leftmost parking lot -->
+<!--
   <node name="spawn_urdf" pkg="gazebo_ros" type="spawn_model" args="-param robot_description -urdf -x 154.0 -y 360.0 -z 0.5 -Y -0.16 -model prius"/>
-
+-->
 
 
 <!-- start on road, close to prototype safe stop area
