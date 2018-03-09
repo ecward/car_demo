@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <launch>
-  <arg name="model" default="$(find rcv_description)/urdf/rcv.urdf"/>
+  <arg name="model" default="$(find rcv_gazebo_description)/urdf/rcv.urdf"/>
   <!--
   <arg name="rvizconfig" default="$(find car_demo)/rviz/demo.rviz" />
   -->
