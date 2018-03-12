@@ -37,7 +37,8 @@
   <joint name="base_link_connection" type="fixed">
     <parent link="base_link"/>
     <child link="chassis"/>
-    <origin xyz="1.45 0 0" rpy="0 0 1.57"/>
+    <!-- <origin xyz="1.45 0 0" rpy="0 0 1.57"/> use geometric centrer as origin -->
+    <origin xyz="0 0 0" rpy="0 0 1.57"/>
     <axis xyz="1 0 0"/>
   </joint>
 
@@ -46,7 +47,7 @@
     <origin xyz="0 0 0" rpy="0 0 1.57"/>
     <geometry>
       <!-- TODO adjust the scale of the mesh -->
-      <mesh filename="package://rcv_description/meshes/RCV_assembly_stl_downsample.dae" scale="0.0264 0.0264 0.0264"/>
+      <mesh filename="package://rcv_gazebo_description/meshes/RCV_assembly_stl_downsample.dae" scale="0.0264 0.0264 0.0264"/>
     </geometry>
   </visual>
 
