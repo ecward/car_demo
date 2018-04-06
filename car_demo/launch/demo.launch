@@ -20,10 +20,11 @@
     <!-- <remap from="robot_description" to="different_robot_description" /> -->
     <!-- <remap from="joint_states" to="/prius/joint_states" /> -->
   </node>
-  <!--
+
+
   <node pkg="fake_localization" type="fake_localization" name="fake_localization">
   </node>
-  -->
+
 
   <!--
   <node pkg="tf2_ros" type="static_transform_publisher" name="very_inaccurate_odom" args="0 0 0 0 0 0 odom base_link"/>

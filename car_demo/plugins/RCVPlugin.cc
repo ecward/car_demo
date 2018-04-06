@@ -264,10 +264,10 @@ public:
 
   /// \brief Gas pedal position in percentage. 1.0 = Fully accelerated.
   double gasPedalPercent = 0; 
-  double fl_torque_percent = 0;
-  double fr_torque_percent = 0;
-  double bl_torque_percent = 0;
-  double br_torque_percent = 0;
+  double fl_torque = 0;
+  double fr_torque = 0;
+  double bl_torque = 0;
+  double br_torque = 0;
 
   /// \brief Threshold delimiting the gas pedal (throttle) low and medium
   /// ranges.
@@ -416,10 +416,10 @@ void RCVPlugin::OnRCVCommand_new(const rcv_msgs::control_command::ConstPtr &msg)
 
   this->dataPtr->handWheelCmd = 2.89469*this->dataPtr->handWheelHigh*msg->kappa;
   this->dataPtr->betaCmd = msg->beta;
-  this->dataPtr->fl_torque_percent = fl_torque;
-  this->dataPtr->fr_torque_percent = fr_torque;
-  this->dataPtr->bl_torque_percent = bl_torque;
-  this->dataPtr->br_torque_percent = br_torque;
+  this->dataPtr->fl_torque = fl_torque;
+  this->dataPtr->fr_torque = fr_torque;
+  this->dataPtr->bl_torque = bl_torque;
+  this->dataPtr->br_torque = br_torque;
 }
 
 /////////////////////////////////////////////////
@@ -1038,10 +1038,10 @@ void RCVPlugin::Reset()
   this->dataPtr->kappaCmd = 0;
   this->dataPtr->betaCmd = 0;
   this->dataPtr->gasPedalPercent = 0;
-  this->dataPtr->fl_torque_percent = 0;
-  this->dataPtr->fr_torque_percent = 0;
-  this->dataPtr->bl_torque_percent = 0;
-  this->dataPtr->br_torque_percent = 0;
+  this->dataPtr->fl_torque = 0;
+  this->dataPtr->fr_torque = 0;
+  this->dataPtr->bl_torque = 0;
+  this->dataPtr->br_torque = 0;
 
   this->dataPtr->brakePedalPercent = 0;
   this->dataPtr->handbrakePercent = 1.0;
@@ -1257,10 +1257,10 @@ void RCVPlugin::Update()
   // torque direction.
   // also, make sure gas pedal is at least as large as the creepPercent.
   double gasPercent = std::max(this->dataPtr->gasPedalPercent, creepPercent);
-  double fltorquepercent = this->dataPtr->fl_torque_percent;
-  double frtorquepercent = this->dataPtr->fr_torque_percent;
-  double bltorquepercent = this->dataPtr->bl_torque_percent;
-  double brtorquepercent = this->dataPtr->br_torque_percent;
+  double fltorque = this->dataPtr->fl_torque;
+  double frtorque = this->dataPtr->fr_torque;
+  double bltorque = this->dataPtr->bl_torque;
+  double brtorque = this->dataPtr->br_torque;
 
   double gasMultiplier = this->GasTorqueMultiplier();
   double flGasTorque = 0, frGasTorque = 0, blGasTorque = 0, brGasTorque = 0;
@@ -1269,14 +1269,18 @@ void RCVPlugin::Update()
   if (fabs(dPtr->flWheelAngularVelocity * dPtr->flWheelRadius) < dPtr->maxSpeed &&
       fabs(dPtr->frWheelAngularVelocity * dPtr->frWheelRadius) < dPtr->maxSpeed)
   {
-    flGasTorque = fltorquepercent * dPtr->frontTorque * gasMultiplier;
-    frGasTorque = frtorquepercent * dPtr->frontTorque * gasMultiplier;
+      //flGasTorque = fltorque * dPtr->frontTorque * gasMultiplier;
+      //frGasTorque = frtorque * dPtr->frontTorque * gasMultiplier;
+      flGasTorque = fltorque * gasMultiplier; // use cmd from topic directly instead of percentage of max
+      frGasTorque = frtorque * gasMultiplier;
   }
   if (fabs(dPtr->blWheelAngularVelocity * dPtr->blWheelRadius) < dPtr->maxSpeed &&
       fabs(dPtr->brWheelAngularVelocity * dPtr->brWheelRadius) < dPtr->maxSpeed)
   {
-    blGasTorque = bltorquepercent * dPtr->backTorque * gasMultiplier;
-    brGasTorque = brtorquepercent * dPtr->backTorque * gasMultiplier;
+      //blGasTorque = bltorque * dPtr->backTorque * gasMultiplier;
+      //brGasTorque = brtorque * dPtr->backTorque * gasMultiplier;
+      blGasTorque = bltorque * gasMultiplier; // use cmd from topic directly instead of percentage of max
+      brGasTorque = brtorque * gasMultiplier;
   }
 
   // auto release handbrake as soon as the gas pedal is depressed
